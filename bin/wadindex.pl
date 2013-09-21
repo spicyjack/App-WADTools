@@ -217,7 +217,14 @@ use 5.010;
 use strict;
 use warnings;
 use utf8;
+
+# system modules
+use Archive::Zip;
 use Carp;
+use Fcntl;
+use File::Find::Rule;
+use File::MMagic;
+use IO::File;
 use Log::Log4perl qw(get_logger :no_extra_logdie_message);
 use Log::Log4perl::Level;
 
@@ -271,8 +278,14 @@ use Log::Log4perl::Level;
                         ->name(q(*.wad), q(*.zip))
                         ->in($cfg->get(q(path)));
 
-    foreach my $file ( @wad_files ) {
-        say qq(File: $file);
+    foreach my $filename ( @wad_files ) {
+        my $file = IO::File->new($filename, O_RDONLY);
+        # use internal magic file
+        my $file_mmagic = File::MMagic->new();
+        #my $file_mime_type = File::MMagic->new(/usr/share/etc/magic);
+        #if ( $filename =~ /\.zip$/ ) {
+        my $file_mime_type = $file_mmagic->checktype_filehandle($file);
+        say qq(File: $filename -> $file_mime_type);
     }
 =cut
 
