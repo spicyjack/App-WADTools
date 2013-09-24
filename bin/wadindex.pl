@@ -282,7 +282,7 @@ use Log::Log4perl::Level;
 
     my @wad_files = File::Find::Rule
                         ->file
-                        ->name(q(*.wad), q(*.zip))
+                        #->name(q(*.wad), q(*.zip))
                         ->in($cfg->get(q(path)));
 
     foreach my $filename ( @wad_files ) {
