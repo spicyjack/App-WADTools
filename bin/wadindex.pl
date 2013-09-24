@@ -228,6 +228,12 @@ use IO::File;
 use Log::Log4perl qw(get_logger :no_extra_logdie_message);
 use Log::Log4perl::Level;
 
+use constant {
+    OCTET_STREAM => q(application/octet-stream),
+    TEXT_PLAIN   => q(text/plain),
+    X_GZIP       => q(application/x-zip),
+};
+
     binmode(STDOUT, ":utf8");
     #my $catalog_file = q(/srv/www/purl/html/Ural_Catalog/UralCatalog.xls);
     # create a logger object
