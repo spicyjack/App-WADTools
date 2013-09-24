@@ -234,9 +234,16 @@ use Log::Log4perl::Level;
     my $cfg = WADIndex::Config->new();
 
     # set up the logger
-    #my $log_conf = qq(log4perl.rootLogger = WARN, Screen\n);
-    my $log_conf = qq(log4perl.rootLogger = INFO, Screen\n);
-    if ( ! -t STDOUT ) {
+    my $log_conf;
+    if ( $cfg->defined(q(debug)) ) {
+        $log_conf = qq(log4perl.rootLogger = DEBUG, Screen\n);
+    } elsif ( $cfg->defined(q(verbose)) ) {
+        $log_conf = qq(log4perl.rootLogger = INFO, Screen\n);
+    } else {
+        $log_conf = qq(log4perl.rootLogger = WARN, Screen\n);
+    }
+
+    if ( -t STDOUT || $cfg->defined(q(colorize)) ) {
         $log_conf .= qq(log4perl.appender.Screen = )
             . qq(Log::Log4perl::Appender::ScreenColoredLevels\n);
     } else {
