@@ -219,19 +219,27 @@ use warnings;
 use utf8;
 
 # system modules
-use Archive::Zip;
+use Archive::Zip qw(:ERROR_CODES);
 use Carp;
+use Data::Dumper;
+$Data::Dumper::Indent = 1;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Terse = 1;
 use Fcntl;
+use File::Basename;
 use File::Find::Rule;
-use File::MMagic;
+use File::LibMagic;
+use File::Temp;
 use IO::File;
 use Log::Log4perl qw(get_logger :no_extra_logdie_message);
 use Log::Log4perl::Level;
 
+# FIXME change these into regexes
+# WARNING: these will change depending on which 'magic' file you're looking at
 use constant {
-    OCTET_STREAM => q(application/octet-stream),
-    TEXT_PLAIN   => q(text/plain),
-    X_GZIP       => q(application/x-zip),
+    OCTET_STREAM => q(application/octet-stream;),
+    TEXT_PLAIN   => q(text/plain; charset=),
+    ZIP        => q(application/zip; charset=binary),
 };
 
     binmode(STDOUT, ":utf8");
@@ -239,6 +247,9 @@ use constant {
     # create a logger object
     my $cfg = WADIndex::Config->new();
 
+    if ( ! $cfg->defined(q(tempdir)) ) {
+        $cfg->set(q(tempdir), q(/dev/shm));
+    }
     # set up the logger
     my $log_conf;
     if ( $cfg->defined(q(debug)) ) {
@@ -291,14 +302,30 @@ use constant {
                         #->name(q(*.wad), q(*.zip))
                         ->in($cfg->get(q(path)));
 
-    foreach my $filename ( @wad_files ) {
-        my $file = IO::File->new($filename, O_RDONLY);
-        # use internal magic file
-        my $file_mmagic = File::MMagic->new();
-        #my $file_mime_type = File::MMagic->new(/usr/share/etc/magic);
+    foreach my $wad_file ( sort(@wad_files) ) {
+        my $filename = basename($wad_file);
+        $log->debug(qq(Processing file $filename));
+        my $magic = File::LibMagic->new(q(/usr/share/file/magic.mgc));
+        #my $magic = File::LibMagic->new();
         #if ( $filename =~ /\.zip$/ ) {
-        my $file_mime_type = $file_mmagic->checktype_filehandle($file);
-        say qq(File: $filename -> $file_mime_type);
+        my $mime_type = $magic->checktype_filename($wad_file);
+        say qq(File: $filename -> $mime_type);
+        if ( $mime_type eq ZIP ) {
+            # NOTE: this directory gets deleted when the script exits this block
+            #my $dh = File::Temp->newdir(
+                # don't unlink files by default; this should be done by the
+                # caller
+            #    UNLINK      => 0,
+            #    DIR         => $cfg->get(q(tempdir)),
+            #    TEMPLATE    => qq(wadindex.$filename.XXXXXXXX),
+            #);
+            #$log->debug(qq(Created temp dir ) . $dh->dirname);
+            my $zip = Archive::Zip->new();
+            die qq(Can't read zipfile $wad_file)
+                unless ( $zip->read($wad_file) == AZ_OK );
+            my @zip_members = $zip->members();
+            $log->debug(q(Zip members: ) . Dumper(@zip_members));
+        }
     }
 =cut
 
