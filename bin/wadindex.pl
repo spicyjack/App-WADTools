@@ -312,19 +312,22 @@ use constant {
         say qq(File: $filename -> $mime_type);
         if ( $mime_type eq ZIP ) {
             # NOTE: this directory gets deleted when the script exits this block
-            #my $dh = File::Temp->newdir(
+            my $dh = File::Temp->newdir(
                 # don't unlink files by default; this should be done by the
                 # caller
-            #    UNLINK      => 0,
-            #    DIR         => $cfg->get(q(tempdir)),
-            #    TEMPLATE    => qq(wadindex.$filename.XXXXXXXX),
-            #);
-            #$log->debug(qq(Created temp dir ) . $dh->dirname);
+                UNLINK      => 1,
+                DIR         => $cfg->get(q(tempdir)),
+                TEMPLATE    => qq(wadindex.$filename.XXXXXXXX),
+            );
+            $log->debug(qq(Created temp dir ) . $dh->dirname);
             my $zip = Archive::Zip->new();
             die qq(Can't read zipfile $wad_file)
                 unless ( $zip->read($wad_file) == AZ_OK );
             my @zip_members = $zip->members();
-            $log->debug(q(Zip members: ) . Dumper(@zip_members));
+            $log->debug(qq(Zip members for $wad_file:));
+            foreach my $member ( @zip_members ) {
+                $log->debug(q(- ) . $member->fileName);
+            }
         }
     }
 =cut
