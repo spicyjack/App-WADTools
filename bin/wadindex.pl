@@ -307,7 +307,6 @@ use constant {
         $log->debug(qq(Processing file $filename));
         my $magic = File::LibMagic->new(q(/usr/share/file/magic.mgc));
         #my $magic = File::LibMagic->new();
-        #if ( $filename =~ /\.zip$/ ) {
         my $mime_type = $magic->checktype_filename($wad_file);
         say qq(File: $filename -> $mime_type);
         if ( $mime_type eq ZIP ) {
@@ -326,10 +325,15 @@ use constant {
             my @zip_members = $zip->members();
             $log->debug(qq(Zip members for $wad_file:));
             foreach my $member ( @zip_members ) {
+                # FIXME capture and save WAD files here
                 $log->debug(q(- ) . $member->fileName);
+
             }
+            #$member->extractMemberWithoutPaths(
+            #    $wadfile, $dh->dirname/$wadfile);
         }
     }
+
 =cut
 
 =back
