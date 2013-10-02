@@ -308,7 +308,7 @@ use constant {
         my $magic = File::LibMagic->new(q(/usr/share/file/magic.mgc));
         #my $magic = File::LibMagic->new();
         my $mime_type = $magic->checktype_filename($wad_file);
-        say qq(File: $filename -> $mime_type);
+        $log->debug(qq(File: $filename -> $mime_type));
         if ( $mime_type eq ZIP ) {
             # NOTE: this directory gets deleted when the script exits this block
             my $dh = File::Temp->newdir(
@@ -322,15 +322,23 @@ use constant {
             my $zip = Archive::Zip->new();
             die qq(Can't read zipfile $wad_file)
                 unless ( $zip->read($wad_file) == AZ_OK );
-            my @zip_members = $zip->members();
             $log->debug(qq(Zip members for $wad_file:));
-            foreach my $member ( @zip_members ) {
-                # FIXME capture and save WAD files here
-                $log->debug(q(- ) . $member->fileName);
+            my @wad_files;
+            foreach my $zip_member ( $zip->members() ) {
+                if ( $zip_member->fileName =~ /\.wad/i ) {
+                    # capture and save WAD files here
+                    $log->debug(q(- extracting: ) . $zip_member->fileName);
+                    $zip->extractMemberWithoutPaths(
+                        $zip_member,
+                        $dh->dirname . q(/) . $zip_member->fileName);
+                    $log->debug(q(- done extracting: ) . $zip_member->fileName);
+                    sleep 15;
+                } else {
+                    $log->debug(q(- Not a WAD file; ')
+                        . $zip_member->fileName . q('));
+                }
 
             }
-            #$member->extractMemberWithoutPaths(
-            #    $wadfile, $dh->dirname/$wadfile);
         }
     }
 
