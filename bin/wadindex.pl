@@ -209,6 +209,64 @@ sub get_args {
     return %{$self->{_args}};
 }
 
+=head2 WADIndex::Indexer
+
+An object used for storing configuration data.
+
+=head3 Object Methods
+
+=cut
+
+#####################
+# WADIndex::Indexer #
+#####################
+package WADIndex::Indexer;
+use strict;
+use warnings;
+use Log::Log4perl;
+
+=over
+
+=item new( )
+
+Parses WAD files, outputs information about the WAD file.
+
+=cut
+
+sub new {
+    my $class = shift;
+    my $self = bless ({}, $class);
+    return $self;
+}
+
+=item index( )
+
+Indexes the contents of a WAD file, and displays the information on the
+screen.
+
+=cut
+
+sub index {
+    my $self = shift;
+    my %args = @_;
+    my $log = Log::Log4perl->get_logger();
+
+    $log->logdie(q(Missing 'filename' argument))
+        unless ( defined $args{filename} );
+    $log->logdie(q(Filename ) . $args{filename} . q( is not readable!))
+        unless ( -r $args{filename} );
+
+    my $filename = $args{filename};
+    open(WAD,shift) or die "Failed to open: $!";
+    my $header;
+    read(WAD,$header,12) == 12 or die "Failed to read header: $!";
+    my ($sig,$lumps,$diroff) = unpack("a4VV",$header);
+}
+
+=back
+
+=cut
+
 ################
 # package main #
 ################
