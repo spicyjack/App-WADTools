@@ -257,10 +257,14 @@ sub index {
         unless ( -r $args{filename} );
 
     my $filename = $args{filename};
-    open(WAD,shift) or die "Failed to open: $!";
+    open(my $WAD, qq(<$filename)) or die "Failed to open '$filename': $!";
     my $header;
-    read(WAD,$header,12) == 12 or die "Failed to read header: $!";
-    my ($sig,$lumps,$diroff) = unpack("a4VV",$header);
+    read($WAD,$header,12) == 12 or die "Failed to read header: $!";
+    my ($wad_sig,$num_lumps,$dir_offset) = unpack("a4VV",$header);
+    $log->info(qq(WAD signature: $wad_sig));
+    $log->info(sprintf(q(Number of lumps:  %u), $num_lumps));
+    $log->info(sprintf(q(Directory offset: %u), $dir_offset));
+    close($WAD);
 }
 
 =back
@@ -355,6 +359,7 @@ use constant {
     $log->info($copyright);
     $log->info(qq(My PID is $$));
 
+    my $indexer = WADIndex::Indexer->new();
     my @wad_files = File::Find::Rule
                         ->file
                         #->name(q(*.wad), q(*.zip))
@@ -386,10 +391,10 @@ use constant {
                 if ( $zip_member->fileName =~ /\.wad/i ) {
                     # capture and save WAD files here
                     $log->debug(q(- extracting: ) . $zip_member->fileName);
-                    $zip->extractMemberWithoutPaths(
-                        $zip_member,
-                        $dh->dirname . q(/) . $zip_member->fileName);
+                    my $temp_file = $dh->dirname . q(/) . $zip_member->fileName;
+                    $zip->extractMemberWithoutPaths($zip_member, $temp_file);
                     $log->debug(q(- done extracting: ) . $zip_member->fileName);
+                    $indexer->index(filename => $temp_file);
                     sleep 15;
                 } else {
                     $log->debug(q(- Not a WAD file; ')
