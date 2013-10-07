@@ -3,8 +3,10 @@
 use strict;
 use warnings;
 
-our $copyright =
-    q|Copyright (c) 2013 by Brian Manning <brian at xaoc dot org>|;
+our @copyright = (
+    q|Copyright (c) 2013 by Brian Manning |,
+    q|<brian at xaoc dot org>|
+);
 
 # For support with this file, please file an issue on the GitHub issue tracker
 # for this project: https://github.com/spicyjack/App-WADTools/issues
@@ -356,7 +358,9 @@ use constant {
 
     # print a nice banner
     $log->info(qq(Starting wadindex.pl, version $VERSION));
-    $log->info($copyright);
+    foreach my $c ( @copyright ) {
+        $log->info($c);
+    }
     $log->info(qq(My PID is $$));
 
     my $indexer = WADIndex::Indexer->new();
@@ -368,11 +372,13 @@ use constant {
     foreach my $wad_file ( sort(@wad_files) ) {
         my $filename = basename($wad_file);
         $log->debug(qq(Processing file $filename));
+        # FIXME this is Linux-specific, and more likely Debian-specific
         my $magic = File::LibMagic->new(q(/usr/share/file/magic.mgc));
         #my $magic = File::LibMagic->new();
         my $mime_type = $magic->checktype_filename($wad_file);
         $log->debug(qq(File: $filename -> $mime_type));
         if ( $mime_type eq ZIP ) {
+            $log->debug(qq(Checking for WAD files in zip file $filename));
             # NOTE: this directory gets deleted when the script exits this block
             my $dh = File::Temp->newdir(
                 # don't unlink files by default; this should be done by the
@@ -390,6 +396,8 @@ use constant {
             foreach my $zip_member ( $zip->members() ) {
                 if ( $zip_member->fileName =~ /\.wad/i ) {
                     # capture and save WAD files here
+                    $log->info(q(Found WAD file: ) . $zip_member->fileName
+                        . qq( in zipfile $filename));
                     $log->debug(q(- extracting: ) . $zip_member->fileName);
                     my $temp_file = $dh->dirname . q(/) . $zip_member->fileName;
                     $zip->extractMemberWithoutPaths($zip_member, $temp_file);
