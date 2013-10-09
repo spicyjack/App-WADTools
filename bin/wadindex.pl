@@ -76,6 +76,8 @@ inside of '.zip' files), create an index that contains:
 
 =item The WAD's average rating on Doomworld
 
+=back
+
 =head1 OBJECTS
 
 =head2 WADIndex::Config
@@ -211,6 +213,8 @@ sub get_args {
     return %{$self->{_args}};
 }
 
+=back
+
 =head2 WADIndex::Indexer
 
 An object used for storing configuration data.
@@ -225,7 +229,13 @@ An object used for storing configuration data.
 package WADIndex::Indexer;
 use strict;
 use warnings;
+use Fcntl qw(:seek);
 use Log::Log4perl;
+
+use constant {
+    WAD_DIRECTORY_ENTRY_SIZE => 16,
+    WAD_HEADER_SIZE          => 12,
+};
 
 =over
 
@@ -259,13 +269,42 @@ sub index {
         unless ( -r $args{filename} );
 
     my $filename = $args{filename};
-    open(my $WAD, qq(<$filename)) or die "Failed to open '$filename': $!";
+    open(my $WAD, qq(<$filename)) or die qq(Failed to open '$filename': $!);
     my $header;
-    read($WAD,$header,12) == 12 or die "Failed to read header: $!";
+    # read the header from the WAD file
+    my $bytes_read = read( $WAD,$header, WAD_HEADER_SIZE );
+    die qq(Failed to read header: $!)
+        unless (defined $bytes_read);
+    die qq(Only read $bytes_read bytes from header, header size is ) .
+        WAD_HEADER_SIZE
+        unless ( $bytes_read == WAD_HEADER_SIZE );
     my ($wad_sig,$num_lumps,$dir_offset) = unpack("a4VV",$header);
     $log->info(qq(WAD signature: $wad_sig));
-    $log->info(sprintf(q(Number of lumps:  %u), $num_lumps));
-    $log->info(sprintf(q(Directory offset: %u), $dir_offset));
+    $log->info(sprintf(q(Number of lumps in the WAD:  %u lumps), $num_lumps));
+    $log->info(sprintf(q(WAD directory start offset: +%u bytes), $dir_offset));
+    for (my $i = 0; $i <= $num_lumps; $i++) {
+        my $lump_entry;
+        # reset bytes read
+        $bytes_read = undef;
+        # read this lump entry
+        $log->info(q(Reading directory entry at offset: )
+            . ($dir_offset + ( $i * WAD_DIRECTORY_ENTRY_SIZE )));
+        die(qq(Can't seek WAD directory entry: $!))
+            unless (seek($WAD,
+                ($dir_offset + ( $i * WAD_DIRECTORY_ENTRY_SIZE )), SEEK_SET));
+        $bytes_read = read($WAD, $lump_entry, WAD_DIRECTORY_ENTRY_SIZE);
+        die "Failed to read WAD directory entry: $!"
+            unless ( defined $bytes_read );
+        die qq(Only read $bytes_read out of ) . WAD_DIRECTORY_ENTRY_SIZE
+            . q( bytes in header)
+            unless ( $bytes_read == WAD_DIRECTORY_ENTRY_SIZE );
+        $log->info(qq(lump entry: $lump_entry));
+        my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
+            $lump_entry );
+        $lump_name =~ s/\0+//g;
+        $log->info(sprintf(qq(  %0.4u name: %8s size: %8u start: %8u),
+            $i, $lump_name, $lump_size, $lump_start));
+    }
     close($WAD);
 }
 
@@ -412,10 +451,6 @@ use constant {
             }
         }
     }
-
-=cut
-
-=back
 
 =head1 AUTHOR
 
