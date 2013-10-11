@@ -229,6 +229,7 @@ An object used for storing configuration data.
 package WADIndex::Indexer;
 use strict;
 use warnings;
+use Data::Hexdumper;
 use Fcntl qw(:seek);
 use Log::Log4perl;
 
@@ -298,11 +299,18 @@ sub index {
         die qq(Only read $bytes_read out of ) . WAD_DIRECTORY_ENTRY_SIZE
             . q( bytes in header)
             unless ( $bytes_read == WAD_DIRECTORY_ENTRY_SIZE );
-        $log->info(qq(lump entry: $lump_entry));
+        my $hexdump = hexdump(
+                data => $lump_entry,
+                output_format => q(%16C::%d),
+        );
+        my ($hex_chars, $data) = split(/::/, $hexdump);
+        $log->info(qq(lump: $data));
+        $log->info(qq(lump: $hex_chars));
+
         my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
             $lump_entry );
         $lump_name =~ s/\0+//g;
-        $log->info(sprintf(qq(  %0.4u name: %8s size: %8u start: %8u),
+        $log->info(sprintf(qq(  %0.4u name: %-8s size: %8u start: %8u),
             $i, $lump_name, $lump_size, $lump_start));
     }
     close($WAD);
@@ -420,8 +428,6 @@ use constant {
             $log->debug(qq(Checking for WAD files in zip file $filename));
             # NOTE: this directory gets deleted when the script exits this block
             my $dh = File::Temp->newdir(
-                # don't unlink files by default; this should be done by the
-                # caller
                 UNLINK      => 1,
                 DIR         => $cfg->get(q(tempdir)),
                 TEMPLATE    => qq(wadindex.$filename.XXXXXXXX),
