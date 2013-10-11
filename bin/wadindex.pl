@@ -283,7 +283,7 @@ sub index {
     $log->info(qq(WAD signature: $wad_sig));
     $log->info(sprintf(q(Number of lumps in the WAD:  %u lumps), $num_lumps));
     $log->info(sprintf(q(WAD directory start offset: +%u bytes), $dir_offset));
-    for (my $i = 0; $i <= $num_lumps; $i++) {
+    for (my $i = 0; $i <= ($num_lumps - 1); $i++) {
         my $lump_entry;
         # reset bytes read
         $bytes_read = undef;
