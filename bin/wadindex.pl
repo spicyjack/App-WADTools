@@ -244,7 +244,7 @@ the zipfile.
 sub new {
     my $class = shift;
     my %args = @_;
-    my $self = bless (%args, $class);
+    my $self = bless ({%args}, $class);
     my $log = Log::Log4perl->get_logger();
 
     my $zip = Archive::Zip->new();
@@ -252,8 +252,14 @@ sub new {
     $log->debug(qq(Reading zipfile: $zipfile));
     $log->logdie(qq(Can't read zipfile $zipfile))
         unless ( $zip->read($zipfile) == AZ_OK );
-    $log->debug(qq(Zip members for $zipfile:));
     $self->{_zip} = $zip;
+    $log->debug("Calling zip->members");
+    my @member_objs = $zip->members();
+    my @members;
+    foreach my $member ( @member_objs ) {
+        push(@members, $member->fileName);
+    }
+    $self->{_members} = \@members;
     return $self;
 }
 
@@ -268,8 +274,7 @@ sub get_zip_members {
     my $zip = $self->{_zip};
     my $log = Log::Log4perl->get_logger();
 
-    $log->debug("Calling zip->members");
-    return $zip->members();
+    return @{$self->{_members}};
 }
 
 =item extract_files(files => \@files)
@@ -518,7 +523,7 @@ use constant {
         if ( $filename =~ /\.zip$/ ) {
             my $zipfile = WADIndex::ZipTool->new(
                 cfg => $cfg,
-                filename => $filename,
+                filename => $cfg->get(q(path)) . q(/) . $filename,
             );
             my @members = $zipfile->get_zip_members();
             my @wad_files = grep(/\.wad/i, @members);
@@ -531,49 +536,6 @@ use constant {
             }
         }
     }
-
-=begin COMMENT
-
-        # FIXME this is Linux-specific, and more likely Debian-specific
-        my $magic = File::LibMagic->new(q(/usr/share/file/magic.mgc));
-        #my $magic = File::LibMagic->new();
-        my $mime_type = $magic->checktype_filename($wad_file);
-        $log->debug(qq(File: $filename -> $mime_type));
-        if ( $mime_type eq ZIP ) {
-            $log->debug(qq(Checking for WAD files in zip file $filename));
-            # NOTE: this directory gets deleted when the script exits this block
-            my $dh = File::Temp->newdir(
-                UNLINK      => 1,
-                DIR         => $cfg->get(q(tempdir)),
-                TEMPLATE    => qq(wadindex.$filename.XXXXXXXX),
-            );
-            $log->debug(qq(Created temp dir ) . $dh->dirname);
-            my $zip = Archive::Zip->new();
-            die qq(Can't read zipfile $wad_file)
-                unless ( $zip->read($wad_file) == AZ_OK );
-            $log->debug(qq(Zip members for $wad_file:));
-            my @wad_files;
-            foreach my $zip_member ( $zip->members() ) {
-                if ( $zip_member->fileName =~ /\.wad/i ) {
-                    # capture and save WAD files here
-                    $log->info(q(Found WAD file: ) . $zip_member->fileName
-                        . qq( in zipfile $filename));
-                    $log->debug(q(- extracting: ) . $zip_member->fileName);
-                    my $temp_file = $dh->dirname . q(/) . $zip_member->fileName;
-                    $zip->extractMemberWithoutPaths($zip_member, $temp_file);
-                    $log->debug(q(- done extracting: ) . $zip_member->fileName);
-                    $indexer->index(filename => $temp_file);
-                    sleep 15;
-                } else {
-                    $log->debug(q(- Not a WAD file; ')
-                        . $zip_member->fileName . q('));
-                }
-
-            }
-        }
-    }
-
-=end COMMENT
 
 =head1 AUTHOR
 
