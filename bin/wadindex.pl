@@ -215,6 +215,96 @@ sub get_args {
 
 =back
 
+=head2 WADIndex::ZipTool
+
+An object used for storing configuration data.
+
+=head3 Object Methods
+
+=cut
+
+#####################
+# WADIndex::ZipTool #
+#####################
+package WADIndex::ZipTool;
+use strict;
+use warnings;
+use Archive::Zip qw(:ERROR_CODES);
+use Log::Log4perl;
+
+=over
+
+=item new(zipfile => $zipfile )
+
+Creates an C<Archive::Zip> object and processes requests for information about
+the zipfile.
+
+=cut
+
+sub new {
+    my $class = shift;
+    my %args = @_;
+    my $self = bless (%args, $class);
+    my $log = Log::Log4perl->get_logger();
+
+    my $zip = Archive::Zip->new();
+    my $zipfile = $self->{filename};
+    $log->debug(qq(Reading zipfile: $zipfile));
+    $log->logdie(qq(Can't read zipfile $zipfile))
+        unless ( $zip->read($zipfile) == AZ_OK );
+    $log->debug(qq(Zip members for $zipfile:));
+    $self->{_zip} = $zip;
+    return $self;
+}
+
+=item get_zip_members( )
+
+Returns all of the files contained inside of the zipfile.
+
+=cut
+
+sub get_zip_members {
+    my $self = shift;
+    my $zip = $self->{_zip};
+    my $log = Log::Log4perl->get_logger();
+
+    $log->debug("Calling zip->members");
+    return $zip->members();
+}
+
+=item extract_files(files => \@files)
+
+Extracts all of the files listed in the array C<@files> from the zipfile and
+returns a scalar containing the path to the temporary directory that the files
+were extracted into.
+
+=cut
+
+sub extract_files {
+    my $self = shift;
+    my %args = @_;
+    my $log = Log::Log4perl->get_logger();
+
+    my $zip = $self->{_zip};
+    my $cfg = $self->{cfg};
+
+    my $dh = File::Temp->newdir(
+        UNLINK      => 1,
+        DIR         => $cfg->get(q(tempdir)),
+        TEMPLATE    => qq(wadindex.XXXXXXXX),
+    );
+    $log->debug(qq(Created temp dir ) . $dh->dirname);
+    foreach my $file ( @{$args{files}} ) {
+        $log->debug(qq(- extracting: $file));
+        my $temp_file = $dh->dirname . q(/) . $file;
+        $zip->extractMemberWithoutPaths($file, $temp_file);
+        $log->debug(q(- done extracting: ) . $file);
+    }
+    return $dh;
+}
+
+=back
+
 =head2 WADIndex::Indexer
 
 An object used for storing configuration data.
@@ -264,56 +354,63 @@ sub index {
     my %args = @_;
     my $log = Log::Log4perl->get_logger();
 
-    $log->logdie(q(Missing 'filename' argument))
-        unless ( defined $args{filename} );
-    $log->logdie(q(Filename ) . $args{filename} . q( is not readable!))
-        unless ( -r $args{filename} );
+    $log->logdie(q(Missing 'tempdir' argument))
+        unless ( defined $args{tempdir} );
+    $log->logdie(q(Missing 'files' argument))
+        unless ( defined $args{files} );
 
-    my $filename = $args{filename};
-    open(my $WAD, qq(<$filename)) or die qq(Failed to open '$filename': $!);
-    my $header;
-    # read the header from the WAD file
-    my $bytes_read = read( $WAD,$header, WAD_HEADER_SIZE );
-    die qq(Failed to read header: $!)
-        unless (defined $bytes_read);
-    die qq(Only read $bytes_read bytes from header, header size is ) .
-        WAD_HEADER_SIZE
-        unless ( $bytes_read == WAD_HEADER_SIZE );
-    my ($wad_sig,$num_lumps,$dir_offset) = unpack("a4VV",$header);
-    $log->info(qq(WAD signature: $wad_sig));
-    $log->info(sprintf(q(Number of lumps in the WAD:  %u lumps), $num_lumps));
-    $log->info(sprintf(q(WAD directory start offset: +%u bytes), $dir_offset));
-    for (my $i = 0; $i <= ($num_lumps - 1); $i++) {
-        my $lump_entry;
-        # reset bytes read
-        $bytes_read = undef;
-        # read this lump entry
-        $log->info(q(Reading directory entry at offset: )
-            . ($dir_offset + ( $i * WAD_DIRECTORY_ENTRY_SIZE )));
-        die(qq(Can't seek WAD directory entry: $!))
-            unless (seek($WAD,
-                ($dir_offset + ( $i * WAD_DIRECTORY_ENTRY_SIZE )), SEEK_SET));
-        $bytes_read = read($WAD, $lump_entry, WAD_DIRECTORY_ENTRY_SIZE);
-        die "Failed to read WAD directory entry: $!"
-            unless ( defined $bytes_read );
-        die qq(Only read $bytes_read out of ) . WAD_DIRECTORY_ENTRY_SIZE
-            . q( bytes in header)
-            unless ( $bytes_read == WAD_DIRECTORY_ENTRY_SIZE );
-        my $hexdump = hexdump(
-                data => $lump_entry,
-                output_format => q(%16C::%d),
-        );
-        my ($hex_chars, $data) = split(/::/, $hexdump);
-        $log->info(qq(lump: $data));
-        $log->info(qq(lump: $hex_chars));
+    foreach my $filename ( @{$args{files}} ) {
+        my $wadfile = $args{tempdir} . q(/) . $filename;
+        open(my $WAD, qq(<$wadfile))
+            or $log->logdie(qq(Failed to open WAD file '$wadfile': $!));
+        my $header;
+        # read the header from the WAD file
+        my $bytes_read = read( $WAD,$header, WAD_HEADER_SIZE );
+        die qq(Failed to read header: $!)
+            unless (defined $bytes_read);
+        die qq(Only read $bytes_read bytes from header, header size is ) .
+            WAD_HEADER_SIZE
+            unless ( $bytes_read == WAD_HEADER_SIZE );
+        my ($wad_sig,$num_lumps,$dir_offset) = unpack("a4VV",$header);
+        $log->info(qq(WAD signature: $wad_sig));
+        $log->info(sprintf(q(Number of lumps in the WAD:  %u lumps),
+            $num_lumps));
+        $log->info(sprintf(q(WAD directory start offset: +%u bytes),
+            $dir_offset));
+        for (my $i = 0; $i <= ($num_lumps - 1); $i++) {
+            my $lump_entry;
+            # reset bytes read
+            $bytes_read = undef;
+            # read this lump entry
+            $log->info(q(Reading directory entry at offset: )
+                . ($dir_offset + ( $i * WAD_DIRECTORY_ENTRY_SIZE )));
+            die(qq(Can't seek WAD directory entry: $!))
+                unless (seek($WAD,
+                    ($dir_offset
+                    + ( $i * WAD_DIRECTORY_ENTRY_SIZE )),
+                    SEEK_SET));
+            $bytes_read = read($WAD, $lump_entry, WAD_DIRECTORY_ENTRY_SIZE);
+            die "Failed to read WAD directory entry: $!"
+                unless ( defined $bytes_read );
+            die qq(Only read $bytes_read out of ) . WAD_DIRECTORY_ENTRY_SIZE
+                . q( bytes in header)
+                unless ( $bytes_read == WAD_DIRECTORY_ENTRY_SIZE );
+            my $hexdump = hexdump(
+                    data => $lump_entry,
+                    output_format => q(%16C::%d),
+            );
+            my ($hex_chars, $data) = split(/::/, $hexdump);
+            $log->info(qq(lump: $data));
+            $log->info(qq(lump: $hex_chars));
 
-        my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
-            $lump_entry );
-        $lump_name =~ s/\0+//g;
-        $log->info(sprintf(qq(  %0.4u name: %-8s size: %8u start: %8u),
-            $i, $lump_name, $lump_size, $lump_start));
+            my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
+                $lump_entry );
+            $lump_name =~ s/\0+//g;
+            $log->info(sprintf(qq(  %0.4u name: %-8s size: %8u start: %8u),
+                $i, $lump_name, $lump_size, $lump_start));
+        }
+        close($WAD);
     }
-    close($WAD);
 }
 
 =back
@@ -330,7 +427,7 @@ use warnings;
 use utf8;
 
 # system modules
-use Archive::Zip qw(:ERROR_CODES);
+
 use Carp;
 use Data::Dumper;
 $Data::Dumper::Indent = 1;
@@ -339,7 +436,7 @@ $Data::Dumper::Terse = 1;
 use Fcntl;
 use File::Basename;
 use File::Find::Rule;
-use File::LibMagic;
+#use File::LibMagic;
 use File::Temp;
 use IO::File;
 use Log::Log4perl qw(get_logger :no_extra_logdie_message);
@@ -415,10 +512,28 @@ use constant {
                         ->file
                         #->name(q(*.wad), q(*.zip))
                         ->in($cfg->get(q(path)));
-
     foreach my $wad_file ( sort(@wad_files) ) {
         my $filename = basename($wad_file);
         $log->debug(qq(Processing file $filename));
+        if ( $filename =~ /\.zip$/ ) {
+            my $zipfile = WADIndex::ZipTool->new(
+                cfg => $cfg,
+                filename => $filename,
+            );
+            my @members = $zipfile->get_zip_members();
+            my @wad_files = grep(/\.wad/i, @members);
+            if ( scalar(@wad_files) > 0 ) {
+                my $temp_dir = $zipfile->extract_files(files => \@wad_files);
+                my $indexer = WADIndex::Indexer->new();
+                $indexer->index(tempdir => $temp_dir, files => \@wad_files);
+            } else {
+                $log->warn(qq(No *.wad files in $zipfile));
+            }
+        }
+    }
+
+=begin COMMENT
+
         # FIXME this is Linux-specific, and more likely Debian-specific
         my $magic = File::LibMagic->new(q(/usr/share/file/magic.mgc));
         #my $magic = File::LibMagic->new();
@@ -457,6 +572,8 @@ use constant {
             }
         }
     }
+
+=end COMMENT
 
 =head1 AUTHOR
 
