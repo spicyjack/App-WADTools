@@ -513,12 +513,12 @@ use constant {
     $log->info(qq(My PID is $$));
 
     my $indexer = WADIndex::Indexer->new();
-    my @wad_files = File::Find::Rule
+    my @files = File::Find::Rule
                         ->file
                         #->name(q(*.wad), q(*.zip))
                         ->in($cfg->get(q(path)));
-    foreach my $wad_file ( sort(@wad_files) ) {
-        my $filename = basename($wad_file);
+    foreach my $found_file ( sort(@files) ) {
+        my $filename = basename($found_file);
         $log->debug(qq(Processing file $filename));
         if ( $filename =~ /\.zip$/ ) {
             my $zipfile = WADIndex::ZipTool->new(
@@ -526,11 +526,11 @@ use constant {
                 filename => $cfg->get(q(path)) . q(/) . $filename,
             );
             my @members = $zipfile->get_zip_members();
-            my @wad_files = grep(/\.wad/i, @members);
-            if ( scalar(@wad_files) > 0 ) {
-                my $temp_dir = $zipfile->extract_files(files => \@wad_files);
+            my @wads_in_zip = grep(/\.wad/i, @members);
+            if ( scalar(@wads_in_zip) > 0 ) {
+                my $temp_dir = $zipfile->extract_files(files => \@wads_in_zip);
                 my $indexer = WADIndex::Indexer->new();
-                $indexer->index(tempdir => $temp_dir, files => \@wad_files);
+                $indexer->index(tempdir => $temp_dir, files => \@wads_in_zip);
             } else {
                 $log->warn(qq(No *.wad files in $zipfile));
             }
