@@ -405,13 +405,16 @@ sub index {
                     output_format => q(%16C::%d),
             );
             my ($hex_chars, $data) = split(/::/, $hexdump);
-            $log->info(qq(lump: $data));
-            $log->info(qq(lump: $hex_chars));
+            $log->debug(qq(lump: $data));
+            # nice header for displaying lump directory entry info
+            $log->debug(
+                qq(     |lump start | lump size | lump name             |));
+            $log->debug(qq(lump: $hex_chars));
 
             my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
                 $lump_entry );
             $lump_name =~ s/\0+//g;
-            $log->info(sprintf(qq(  %0.4u name: %-8s size: %8u start: %8u),
+            $log->info(sprintf(qq(%0.4u name: %-8s size: %8u start: %8u),
                 $i, $lump_name, $lump_size, $lump_start));
         }
         close($WAD);
