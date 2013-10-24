@@ -366,6 +366,7 @@ sub index {
 
     foreach my $filename ( @{$args{files}} ) {
         my $wadfile = $args{tempdir} . q(/) . $filename;
+        $log->debug(qq(Reading WAD info from $filename));
         open(my $WAD, qq(<$wadfile))
             or $log->logdie(qq(Failed to open WAD file '$wadfile': $!));
         my $header;
@@ -380,14 +381,14 @@ sub index {
         $log->info(qq(WAD signature: $wad_sig));
         $log->info(sprintf(q(Number of lumps in the WAD:  %u lumps),
             $num_lumps));
-        $log->info(sprintf(q(WAD directory start offset: +%u bytes),
+        $log->debug(sprintf(q(WAD directory start offset: +%u bytes),
             $dir_offset));
         for (my $i = 0; $i <= ($num_lumps - 1); $i++) {
             my $lump_entry;
             # reset bytes read
             $bytes_read = undef;
             # read this lump entry
-            $log->info(q(Reading directory entry at offset: )
+            $log->debug(q(Reading directory entry at offset: )
                 . ($dir_offset + ( $i * WAD_DIRECTORY_ENTRY_SIZE )));
             die(qq(Can't seek WAD directory entry: $!))
                 unless (seek($WAD,
@@ -405,17 +406,19 @@ sub index {
                     output_format => q(%16C::%d),
             );
             my ($hex_chars, $data) = split(/::/, $hexdump);
-            $log->debug(qq(lump: $data));
+            $log->debug(qq(-> lump: $data));
             # nice header for displaying lump directory entry info
             $log->debug(
-                qq(     |lump start | lump size | lump name             |));
-            $log->debug(qq(lump: $hex_chars));
+                qq(->     |lump start | lump size | lump name             |));
+            $log->debug(qq(-> $hex_chars));
 
             my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
                 $lump_entry );
             $lump_name =~ s/\0+//g;
-            $log->info(sprintf(qq(%0.4u name: %-8s size: %8u start: %8u),
-                $i, $lump_name, $lump_size, $lump_start));
+            $log->info(sprintf(q(lump ID: #%4u lump name: %-8s),
+                $i, $lump_name));
+            $log->info(sprintf(q(lump size: %8u  lump start: %8u),
+                $lump_size, $lump_start));
         }
         close($WAD);
     }
