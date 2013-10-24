@@ -406,11 +406,11 @@ sub index {
             die qq(Only read $bytes_read out of ) . WAD_DIRECTORY_ENTRY_SIZE
                 . q( bytes in header)
                 unless ( $bytes_read == WAD_DIRECTORY_ENTRY_SIZE );
-            my $hexdump = hexdump(
+            my ($hex_chars, $data) = split(/::/,
+                hexdump(
                     data => $lump_entry,
                     output_format => q(%16C::%d),
-            );
-            my ($hex_chars, $data) = split(/::/, $hexdump);
+            ));
             $log->debug(qq(-> lump: $data));
             # nice header for displaying lump directory entry info
             $log->debug(
