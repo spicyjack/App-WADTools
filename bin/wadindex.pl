@@ -364,7 +364,12 @@ sub index {
     $log->logdie(q(Missing 'files' argument))
         unless ( defined $args{files} );
 
-    foreach my $filename ( @{$args{files}} ) {
+    FILE: foreach my $filename ( @{$args{files}} ) {
+        # skip dotfiles
+        if ( $filename =~ m!/\.\w+! ) {
+            $log->debug(qq(Skipping dotfile '$filename'));
+            next FILE;
+        }
         my $wadfile = $args{tempdir} . q(/) . $filename;
         $log->debug(qq(Reading WAD info from $filename));
         open(my $WAD, qq(<$wadfile))
