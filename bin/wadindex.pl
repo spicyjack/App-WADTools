@@ -411,18 +411,18 @@ sub index {
                     data => $lump_entry,
                     output_format => q(%16C::%d),
             ));
-            $log->debug(qq(-> lump: $data));
+            $log->debug(qq(-> lump raw data: $data));
             # nice header for displaying lump directory entry info
             $log->debug(
-                qq(->     |lump start | lump size | lump name             |));
+                qq(->|lump start | lump size | lump name             |));
             $log->debug(qq(-> $hex_chars));
 
             my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
                 $lump_entry );
             $lump_name =~ s/\0+//g;
-            $log->info(sprintf(q(lump ID: #%4u lump name: %-8s),
+            $log->info(sprintf(q(lump ID #:     %4u  lump name:  %-8s),
                 $i, $lump_name));
-            $log->info(sprintf(q(lump size: %8u  lump start: %8u),
+            $log->info(sprintf(q(lump size: %8u  lump start: %-8u),
                 $lump_size, $lump_start));
         }
         close($WAD);
