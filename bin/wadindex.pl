@@ -371,7 +371,7 @@ sub index {
             next FILE;
         }
         my $wadfile = $args{tempdir} . q(/) . $filename;
-        $log->debug(qq(Reading WAD info from $filename));
+        $log->info(qq(Reading WAD info from '$filename'));
         open(my $WAD, qq(<$wadfile))
             or $log->logdie(qq(Failed to open WAD file '$wadfile': $!));
         my $header;
@@ -420,10 +420,8 @@ sub index {
             my ($lump_start, $lump_size, $lump_name) = unpack(q(VVa8),
                 $lump_entry );
             $lump_name =~ s/\0+//g;
-            $log->info(sprintf(q(lump ID #:     %4u  lump name:  %-8s),
-                $i, $lump_name));
-            $log->info(sprintf(q(lump size: %8u  lump start: %-8u),
-                $lump_size, $lump_start));
+            $log->info(sprintf(q(ID# %4u name: %-8s size: %8u start: %8x),
+                $i, $lump_name, $lump_size, $lump_start));
         }
         close($WAD);
     }
@@ -502,7 +500,7 @@ use constant {
         # %M{1}: Name of the method name where logging request was issued
         # %m: message
         # %n: newline
-        . qq|= [%8r] %p{1} %4L (%M{1}) %m%n\n|;
+        . qq|= [%6r] %p{1} %4L (%M{1}) %m%n\n|;
         #. qq( = %d %p %m%n\n)
         #. qq(= %d{HH.mm.ss} %p -> %m%n\n);
 
@@ -530,7 +528,7 @@ use constant {
                         ->in($cfg->get(q(path)));
     foreach my $found_file ( sort(@files) ) {
         my $filename = basename($found_file);
-        $log->debug(qq(Processing file $filename));
+        $log->info(qq(Processing file $filename));
         if ( $filename =~ /\.zip$/ ) {
             my $zipfile = WADIndex::ZipTool->new(
                 cfg => $cfg,
@@ -539,11 +537,13 @@ use constant {
             my @members = $zipfile->get_zip_members();
             my @wads_in_zip = grep(/\.wad/i, @members);
             if ( scalar(@wads_in_zip) > 0 ) {
+                $log->info(q(Extracting ) . scalar(@wads_in_zip)
+                    . qq( WADs from zipfile '$filename'));
                 my $temp_dir = $zipfile->extract_files(files => \@wads_in_zip);
                 my $indexer = WADIndex::Indexer->new();
                 $indexer->index(tempdir => $temp_dir, files => \@wads_in_zip);
             } else {
-                $log->warn(qq(No *.wad files in $zipfile));
+                $log->warn(qq(No *.wad files in $filename));
             }
         }
     }
